@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Renderererer — a focused 3D product photography studio for high-resolution transparent renders." />
+  <title>Renderererer</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+        "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="Renderererer">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M13.7 2.5 5.8 13h5.1l-.7 8.5L18.3 10h-5.2l.6-7.5Z"/></svg>
+        </div>
+        <div>
+          <strong>Renderererer</strong>
+        </div>
+      </div>
+
+      <div class="file-pill" id="filePill">
+        <span class="status-dot"></span>
+        <span id="fileName">Studio demo</span>
+        <span class="file-meta" id="fileMeta">Ready</span>
+      </div>
+
+      <div class="top-actions">
+        <button class="button secondary" id="loadButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+          Open model
+        </button>
+        <button class="button primary" id="exportButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-4.5-4.5M12 16l4.5-4.5M5 18v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1"/></svg>
+          Export PNG
+        </button>
+      </div>
+      <input id="fileInput" type="file" multiple accept=".glb,.gltf,.obj,.mtl,.stl,.fbx,.usdz,image/*,.bin" hidden />
+    </header>
+
+    <main class="workspace">
+      <aside class="panel left-panel" aria-label="Studio controls">
+        <div class="panel-scroll">
+          <section class="control-section">
+            <div class="section-heading">
+              <span>Scene</span>
+              <button class="icon-button" id="resetScene" type="button" title="Reset scene">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.6 15.5A8 8 0 1 0 6 7.5L4 10"/></svg>
+              </button>
+            </div>
+            <label class="field-label" for="environmentPreset">Lighting preset</label>
+            <div class="select-wrap">
+              <select id="environmentPreset">
+                <option value="softbox">Softbox</option>
+                <option value="bright">Bright studio</option>
+                <option value="dramatic">Dramatic</option>
+                <option value="catalog">Catalog</option>
+              </select>
+            </div>
+            <div class="control-row">
+              <label for="exposure">Exposure <output id="exposureValue">1.10</output></label>
+              <input id="exposure" type="range" min="0.25" max="2.5" step="0.05" value="1.1" />
+            </div>
+            <div class="control-row">
+              <label for="shadowStrength">Contact shadow <output id="shadowValue">35%</output></label>
+              <input id="shadowStrength" type="range" min="0" max="0.8" step="0.01" value="0.35" />
+            </div>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><span>Camera</span></div>
+            <div class="segmented" id="cameraType" role="group" aria-label="Camera type">
+              <button class="active" type="button" data-camera="perspective">Perspective</button>
+              <button type="button" data-camera="orthographic">Orthographic</button>
+            </div>
+            <div class="control-row" id="focalRow">
+              <label for="focalLength">Focal length <output id="focalValue">70 mm</output></label>
+              <input id="focalLength" type="range" min="24" max="150" step="1" value="70" />
+            </div>
+            <div class="camera-actions">
+              <button class="text-button" id="frameModel" type="button">Frame object</button>
+              <button class="text-button" id="frontView" type="button">Front view</button>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><span>Object angles</span><span class="section-hint">Click to frame</span></div>
+            <div class="angle-grid" role="group" aria-label="Object angle presets">
+              <button type="button" data-angle="top"><i>↑</i><span>Top</span></button>
+              <button type="button" data-angle="bottom"><i>↓</i><span>Bottom</span></button>
+              <button type="button" data-angle="front"><i>●</i><span>Front</span></button>
+              <button type="button" data-angle="back"><i>○</i><span>Back</span></button>
+              <button type="button" data-angle="left"><i>←</i><span>Left</span></button>
+              <button type="button" data-angle="right"><i>→</i><span>Right</span></button>
+              <button type="button" data-angle="three-quarter-left"><i>↖</i><span>3/4 left</span></button>
+              <button type="button" data-angle="three-quarter-right"><i>↗</i><span>3/4 right</span></button>
+            </div>
+          </section>
+
+          <section class="control-section camera-presets-section">
+            <div class="section-heading"><span>Camera presets</span><span class="preset-count" id="presetCount">0 saved</span></div>
+            <div class="preset-save-row">
+              <input id="presetName" type="text" maxlength="32" placeholder="Preset name" aria-label="Camera preset name" />
+              <button id="saveCameraPreset" type="button" title="Save current camera" aria-label="Save current camera">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+            <div class="preset-list" id="presetList"></div>
+            <p class="local-save-note">Saved in this browser for repeatable shots across models.</p>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><span>Backdrop</span></div>
+            <div class="swatches" role="group" aria-label="Backdrop color">
+              <button class="swatch transparent active" type="button" data-bg="transparent" aria-label="Transparent" title="Transparent"></button>
+              <button class="swatch cloud" type="button" data-bg="cloud" aria-label="Cloud gray" title="Cloud gray"></button>
+              <button class="swatch white" type="button" data-bg="white" aria-label="White" title="White"></button>
+              <button class="swatch charcoal" type="button" data-bg="charcoal" aria-label="Charcoal" title="Charcoal"></button>
+            </div>
+            <label class="toggle-row">
+              <span>Ground shadow</span>
+              <input id="groundToggle" type="checkbox" checked />
+              <span class="toggle-ui"></span>
+            </label>
+            <label class="toggle-row">
+              <span>Show grid</span>
+              <input id="gridToggle" type="checkbox" />
+              <span class="toggle-ui"></span>
+            </label>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><span>Object</span></div>
+            <div class="control-row">
+              <label for="rotation">Turntable <output id="rotationValue">0°</output></label>
+              <input id="rotation" type="range" min="-180" max="180" step="1" value="0" />
+            </div>
+            <div class="control-row">
+              <label for="modelScale">Scale <output id="scaleValue">100%</output></label>
+              <input id="modelScale" type="range" min="0.25" max="2" step="0.01" value="1" />
+            </div>
+            <label class="toggle-row">
+              <span>Auto-rotate</span>
+              <input id="autoRotate" type="checkbox" />
+              <span class="toggle-ui"></span>
+            </label>
+          </section>
+        </div>
+        <div class="privacy-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v10H6z"/></svg>
+          Files stay in this browser
+        </div>
+      </aside>
+
+      <section class="stage" id="stage" aria-label="3D viewport">
+        <canvas id="viewport"></canvas>
+        <div class="canvas-backdrop" id="canvasBackdrop"></div>
+
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-card">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5m0 0L8 9m4-4 4 4M6 14H5a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-1"/></svg>
+            </div>
+            <strong>Drop your 3D model</strong>
+            <span>GLB, GLTF, OBJ, STL, FBX or USDZ</span>
+          </div>
+        </div>
+
+        <div class="view-cube" aria-hidden="true">
+          <div class="cube-face">FRONT</div>
+        </div>
+
+        <div class="view-hint">
+          <span><i class="mouse-icon"></i> Orbit</span>
+          <span><i class="mouse-icon middle"></i> Pan</span>
+          <span><i class="scroll-icon"></i> Zoom</span>
+        </div>
+
+        <div class="render-status" id="renderStatus" role="status" aria-live="polite">
+          <span class="spinner"></span>
+          <span id="renderStatusText">Preparing model…</span>
+        </div>
+      </section>
+
+      <aside class="panel right-panel" aria-label="Export controls">
+        <div class="panel-scroll">
+          <section class="control-section export-section">
+            <div class="section-heading"><span>Output</span><span class="format-badge">PNG</span></div>
+
+            <label class="field-label" for="sizePreset">Size preset</label>
+            <div class="select-wrap">
+              <select id="sizePreset">
+                <option value="web">Web · 2048 px</option>
+                <option value="print" selected>Print · 4096 px</option>
+                <option value="social">Social · 2400 × 3000</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="dimensions">
+              <label>Width <input id="exportWidth" type="number" min="256" max="8192" step="1" value="4096" /></label>
+              <button class="link-button active" id="ratioLock" type="button" title="Lock aspect ratio" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8H7a4 4 0 0 0 0 8h2m6-8h2a4 4 0 0 1 0 8h-2m-7-4h8"/></svg>
+              </button>
+              <label>Height <input id="exportHeight" type="number" min="256" max="8192" step="1" value="4096" /></label>
+            </div>
+
+            <div class="export-summary">
+              <span id="megapixels">16.8 megapixels</span>
+              <span id="aspectRatio">1:1</span>
+            </div>
+
+            <label class="toggle-row prominent-toggle">
+              <div>
+                <span>Transparent background</span>
+                <small>Export with alpha channel</small>
+              </div>
+              <input id="transparentExport" type="checkbox" checked />
+              <span class="toggle-ui"></span>
+            </label>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><span>Quality</span></div>
+            <label class="toggle-row">
+              <span>Antialiasing</span>
+              <input id="antialiasing" type="checkbox" checked />
+              <span class="toggle-ui"></span>
+            </label>
+            <label class="toggle-row">
+              <span>High-quality shadows</span>
+              <input id="hqShadows" type="checkbox" checked />
+              <span class="toggle-ui"></span>
+            </label>
+            <div class="control-row">
+              <label for="padding">Object padding <output id="paddingValue">12%</output></label>
+              <input id="padding" type="range" min="2" max="30" step="1" value="12" />
+            </div>
+          </section>
+        </div>
+
+        <div class="export-footer">
+          <button class="button primary export-large" id="exportLarge" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-4.5-4.5M12 16l4.5-4.5M5 18v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1"/></svg>
+            <span>Render &amp; download<small id="exportDimensions">4096 × 4096 PNG</small></span>
+          </button>
+          <button class="button batch-export" id="batchExport" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 4v6M17 4v6M5 13h4v4H5zM10 13h4v4h-4zM15 13h4v4h-4zM12 19v2m0 0-2-2m2 2 2-2"/></svg>
+            <span>Download all 8 angles<small>ZIP · current output settings</small></span>
+          </button>
+          <p>Single: 8192 px max · Batch: 4096 px max</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
