@@ -6,7 +6,7 @@
   <meta name="description" content="Renderererer — a focused 3D product photography studio for high-resolution transparent renders." />
   <title>Renderererer</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-  <link rel="stylesheet" href="./styles.css?v=20261023-2" />
+  <link rel="stylesheet" href="./styles.css?v=20261023-3" />
   <script type="importmap">
     {
       "imports": {
@@ -186,6 +186,32 @@
               </div>
               <input id="modelScale" type="range" min="0.25" max="2" step="0.01" value="1" />
             </div>
+            <div class="centerline-heading">
+              <span>Manual centerline</span>
+              <button class="text-button" id="resetCenterline" type="button">Reset</button>
+            </div>
+            <p class="centerline-note">Sets the pivot used by Turntable and Rotate. Values are a percentage of model size.</p>
+            <div class="control-row compact-control-row">
+              <div class="range-heading">
+                <label for="centerlineX">Centerline X</label>
+                <span class="range-number has-unit"><input id="centerlineXValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Centerline X offset percentage" /><span>%</span></span>
+              </div>
+              <input id="centerlineX" type="range" min="-100" max="100" step="1" value="0" />
+            </div>
+            <div class="control-row compact-control-row">
+              <div class="range-heading">
+                <label for="centerlineY">Centerline Y</label>
+                <span class="range-number has-unit"><input id="centerlineYValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Centerline Y offset percentage" /><span>%</span></span>
+              </div>
+              <input id="centerlineY" type="range" min="-100" max="100" step="1" value="0" />
+            </div>
+            <div class="control-row compact-control-row">
+              <div class="range-heading">
+                <label for="centerlineZ">Centerline Z</label>
+                <span class="range-number has-unit"><input id="centerlineZValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Centerline Z offset percentage" /><span>%</span></span>
+              </div>
+              <input id="centerlineZ" type="range" min="-100" max="100" step="1" value="0" />
+            </div>
             <label class="toggle-row">
               <span>Auto-rotate</span>
               <input id="autoRotate" type="checkbox" />
@@ -305,6 +331,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./app.js?v=20261023-2"></script>
+  <script type="module" src="./app.js?v=20261023-3"></script>
 </body>
 </html>
