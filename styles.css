@@ -91,6 +91,11 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 13px; heigh
 .camera-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 14px; }
 .text-button { height: 32px; color: #cbd1cf; border: 1px solid var(--line); background: transparent; border-radius: 7px; font-size: 10px; cursor: pointer; }
 .text-button:hover { border-color: var(--line-strong); background: rgba(255,255,255,.035); }
+.centerline-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); }
+.centerline-heading > span { color: #d5dbd9; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.centerline-heading .text-button { width: 50px; height: 25px; }
+.centerline-note { margin: 7px 0 3px; color: #68716f; font-size: 8px; line-height: 1.45; }
+.compact-control-row { padding-top: 8px; }
 .section-hint, .preset-count { color: #66706d; font-size: 8px; font-weight: 650; letter-spacing: .04em; text-transform: none; }
 .angle-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
 .angle-grid button { min-width: 0; height: 52px; padding: 6px 3px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.018); color: #9da6a3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
