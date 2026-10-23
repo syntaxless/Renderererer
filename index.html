@@ -108,6 +108,7 @@
               <button type="button" data-angle="top"><i>↑</i><span>Top</span></button>
               <button type="button" data-angle="bottom"><i>↓</i><span>Bottom</span></button>
               <button type="button" data-angle="front"><i>●</i><span>Front</span></button>
+              <button type="button" data-angle="front-elevated"><i>↥</i><span>Front elevated</span></button>
               <button type="button" data-angle="back"><i>○</i><span>Back</span></button>
               <button type="button" data-angle="left"><i>←</i><span>Left</span></button>
               <button type="button" data-angle="right"><i>→</i><span>Right</span></button>
@@ -166,10 +167,17 @@
             </div>
             <div class="control-row">
               <div class="range-heading">
-                <label for="objectRotate">Rotate</label>
-                <span class="range-number has-unit"><input id="objectRotateValue" type="number" min="-180" max="180" step="1" value="0" aria-label="Object rotation in degrees" /><span>°</span></span>
+                <label for="rotateX">Rotate X</label>
+                <span class="range-number has-unit"><input id="rotateXValue" type="number" min="-180" max="180" step="1" value="0" aria-label="Object X rotation in degrees" /><span>°</span></span>
               </div>
-              <input id="objectRotate" type="range" min="-180" max="180" step="1" value="0" />
+              <input id="rotateX" type="range" min="-180" max="180" step="1" value="0" />
+            </div>
+            <div class="control-row">
+              <div class="range-heading">
+                <label for="rotateY">Rotate Y</label>
+                <span class="range-number has-unit"><input id="rotateYValue" type="number" min="-180" max="180" step="1" value="0" aria-label="Object Y rotation in degrees" /><span>°</span></span>
+              </div>
+              <input id="rotateY" type="range" min="-180" max="180" step="1" value="0" />
             </div>
             <div class="control-row">
               <div class="range-heading">
@@ -288,7 +296,7 @@
           </button>
           <button class="button batch-export" id="batchExport" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 4v6M17 4v6M5 13h4v4H5zM10 13h4v4h-4zM15 13h4v4h-4zM12 19v2m0 0-2-2m2 2 2-2"/></svg>
-            <span>Download all 8 angles<small>ZIP · current output settings</small></span>
+            <span>Download all 9 angles<small>ZIP · current output settings</small></span>
           </button>
           <p>Single: 8192 px max · Batch: 4096 px max</p>
         </div>
