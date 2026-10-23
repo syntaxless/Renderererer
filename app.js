@@ -26,16 +26,22 @@ const state = {
   objectName: 'studio-demo',
   objectBounds: null,
   angleBaseline: null,
+  modelScale: 1,
+  centerline: { x: 0, y: 0, z: 0 },
+  baseObjectPosition: new THREE.Vector3(),
+  pivotReferenceSize: new THREE.Vector3(1, 1, 1),
 };
 
 const CAMERA_PRESET_KEY = 'product-shot-studio.camera-presets.v1';
 let cameraPresets = readCameraPresets();
 
 const scene = new THREE.Scene();
+const pivotRoot = new THREE.Group();
 const modelPivot = new THREE.Group();
 const orientationPivot = new THREE.Group();
 modelPivot.add(orientationPivot);
-scene.add(modelPivot);
+pivotRoot.add(modelPivot);
+scene.add(pivotRoot);
 
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -201,8 +207,45 @@ function normalizeObject(object) {
   object.position.y -= normalizedBox.min.y;
   object.updateMatrixWorld(true);
   state.objectBounds = new THREE.Box3().setFromObject(object);
+  state.baseObjectPosition.copy(object.position);
+  state.objectBounds.getSize(state.pivotReferenceSize);
   state.baseScale = object.scale.x;
+  state.modelScale = 1;
+  state.centerline = { x: 0, y: 0, z: 0 };
+  pivotRoot.position.set(0, 0, 0);
   setRangePair('modelScale', 'scaleValue', 1, 100);
+  setRangePair('centerlineX', 'centerlineXValue', 0);
+  setRangePair('centerlineY', 'centerlineYValue', 0);
+  setRangePair('centerlineZ', 'centerlineZValue', 0);
+}
+
+function applyCenterline() {
+  if (!currentObject) return;
+  const scale = state.modelScale || 1;
+  const offset = new THREE.Vector3(
+    state.pivotReferenceSize.x * scale * state.centerline.x / 100,
+    state.pivotReferenceSize.y * scale * state.centerline.y / 100,
+    state.pivotReferenceSize.z * scale * state.centerline.z / 100,
+  );
+  pivotRoot.position.copy(offset);
+  currentObject.position.copy(state.baseObjectPosition).sub(offset);
+  scene.updateMatrixWorld(true);
+}
+
+function setCenterline(axis, value) {
+  state.centerline[axis] = value;
+  applyCenterline();
+  $$('.angle-grid button').forEach((button) => button.classList.remove('active'));
+}
+
+function resetCenterline(showMessage = true) {
+  state.centerline = { x: 0, y: 0, z: 0 };
+  setRangePair('centerlineX', 'centerlineXValue', 0);
+  setRangePair('centerlineY', 'centerlineYValue', 0);
+  setRangePair('centerlineZ', 'centerlineZValue', 0);
+  applyCenterline();
+  $$('.angle-grid button').forEach((button) => button.classList.remove('active'));
+  if (showMessage) showToast('Centerline reset');
 }
 
 function getBounds() {
@@ -450,6 +493,7 @@ function captureCameraPreset(name) {
     objectRotationY: modelPivot.rotation.y,
     objectRotationX: orientationPivot.rotation.x,
     objectOrientationY: orientationPivot.rotation.y,
+    centerline: { ...state.centerline },
     modelScale: Number($('#modelScale').value),
     padding: state.padding,
     angleBaseline: state.angleBaseline ? {
@@ -497,8 +541,19 @@ function applyCameraPreset(preset) {
   setRangePair('rotateY', 'rotateYValue', rotateYDegrees);
 
   const modelScale = THREE.MathUtils.clamp(Number(preset.modelScale) || 1, .25, 2);
+  state.modelScale = modelScale;
   currentObject.scale.setScalar(state.baseScale * modelScale);
   setRangePair('modelScale', 'scaleValue', modelScale, modelScale * 100);
+
+  state.centerline = {
+    x: THREE.MathUtils.clamp(Number(preset.centerline?.x) || 0, -100, 100),
+    y: THREE.MathUtils.clamp(Number(preset.centerline?.y) || 0, -100, 100),
+    z: THREE.MathUtils.clamp(Number(preset.centerline?.z) || 0, -100, 100),
+  };
+  setRangePair('centerlineX', 'centerlineXValue', state.centerline.x);
+  setRangePair('centerlineY', 'centerlineYValue', state.centerline.y);
+  setRangePair('centerlineZ', 'centerlineZValue', state.centerline.z);
+  applyCenterline();
 
   state.padding = THREE.MathUtils.clamp(Number(preset.padding) || 12, 2, 30);
   setRangePair('padding', 'paddingValue', state.padding);
@@ -751,6 +806,7 @@ function replaceCurrentObject(object, name, fileCount) {
   orientationPivot.remove(currentObject);
   currentObject = object;
   currentObject.name = name;
+  pivotRoot.position.set(0, 0, 0);
   modelPivot.rotation.set(0, 0, 0);
   orientationPivot.rotation.set(0, 0, 0);
   orientationPivot.add(currentObject);
@@ -819,9 +875,27 @@ bindRangePair({
   rangeToNumber: (value) => value * 100,
   numberToRange: (value) => value / 100,
   onChange: (scale) => {
+    state.modelScale = scale;
     currentObject.scale.setScalar(state.baseScale * scale);
+    applyCenterline();
   },
 });
+bindRangePair({
+  rangeId: 'centerlineX',
+  numberId: 'centerlineXValue',
+  onChange: (value) => setCenterline('x', value),
+});
+bindRangePair({
+  rangeId: 'centerlineY',
+  numberId: 'centerlineYValue',
+  onChange: (value) => setCenterline('y', value),
+});
+bindRangePair({
+  rangeId: 'centerlineZ',
+  numberId: 'centerlineZValue',
+  onChange: (value) => setCenterline('z', value),
+});
+$('#resetCenterline').addEventListener('click', () => resetCenterline(true));
 $('#autoRotate').addEventListener('change', (event) => { controls.autoRotate = event.target.checked; controls.autoRotateSpeed = 1.1; });
 $('#groundToggle').addEventListener('change', (event) => { floor.visible = event.target.checked; });
 $('#gridToggle').addEventListener('change', (event) => { grid.visible = event.target.checked; });
@@ -856,7 +930,9 @@ function resetScene() {
   controls.autoRotate = false; $('#autoRotate').checked = false;
   floor.visible = false; $('#groundToggle').checked = false;
   currentObject.scale.setScalar(state.baseScale);
+  state.modelScale = 1;
   setRangePair('modelScale', 'scaleValue', 1, 100);
+  resetCenterline(false);
   $('#environmentPreset').value = 'softbox'; applyLightingPreset('softbox');
   resetAngleBaseline(false);
   fitCameraToObject(); showToast('Scene reset');
