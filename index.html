@@ -68,11 +68,17 @@
               </select>
             </div>
             <div class="control-row">
-              <label for="exposure">Exposure <output id="exposureValue">1.10</output></label>
-              <input id="exposure" type="range" min="0.25" max="2.5" step="0.05" value="1.1" />
+              <div class="range-heading">
+                <label for="exposure">Exposure</label>
+                <span class="range-number"><input id="exposureValue" type="number" min="-2" max="2.5" step="0.05" value="1.10" aria-label="Exposure value" /></span>
+              </div>
+              <input id="exposure" type="range" min="-2" max="2.5" step="0.05" value="1.1" />
             </div>
             <div class="control-row">
-              <label for="shadowStrength">Contact shadow <output id="shadowValue">35%</output></label>
+              <div class="range-heading">
+                <label for="shadowStrength">Contact shadow</label>
+                <span class="range-number has-unit"><input id="shadowValue" type="number" min="0" max="80" step="1" value="35" aria-label="Contact shadow percentage" /><span>%</span></span>
+              </div>
               <input id="shadowStrength" type="range" min="0" max="0.8" step="0.01" value="0.35" />
             </div>
           </section>
@@ -84,7 +90,10 @@
               <button type="button" data-camera="orthographic">Orthographic</button>
             </div>
             <div class="control-row" id="focalRow">
-              <label for="focalLength">Focal length <output id="focalValue">70 mm</output></label>
+              <div class="range-heading">
+                <label for="focalLength">Focal length</label>
+                <span class="range-number has-unit"><input id="focalValue" type="number" min="24" max="150" step="1" value="70" aria-label="Focal length in millimeters" /><span>mm</span></span>
+              </div>
               <input id="focalLength" type="range" min="24" max="150" step="1" value="70" />
             </div>
             <div class="camera-actions">
@@ -105,6 +114,13 @@
               <button type="button" data-angle="three-quarter-left"><i>↖</i><span>3/4 left</span></button>
               <button type="button" data-angle="three-quarter-right"><i>↗</i><span>3/4 right</span></button>
             </div>
+            <div class="baseline-actions">
+              <button class="text-button baseline-set" id="setAngleBaseline" type="button">Set current view as baseline</button>
+              <button class="icon-button baseline-reset" id="resetAngleBaseline" type="button" title="Reset angle baseline" aria-label="Reset angle baseline" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M5.6 15.5A8 8 0 1 0 6 7.5L4 10"/></svg>
+              </button>
+            </div>
+            <p class="baseline-status" id="angleBaselineStatus">Using the default front view.</p>
           </section>
 
           <section class="control-section camera-presets-section">
@@ -142,11 +158,24 @@
           <section class="control-section">
             <div class="section-heading"><span>Object</span></div>
             <div class="control-row">
-              <label for="rotation">Turntable <output id="rotationValue">0°</output></label>
+              <div class="range-heading">
+                <label for="rotation">Turntable</label>
+                <span class="range-number has-unit"><input id="rotationValue" type="number" min="-180" max="180" step="1" value="0" aria-label="Turntable angle in degrees" /><span>°</span></span>
+              </div>
               <input id="rotation" type="range" min="-180" max="180" step="1" value="0" />
             </div>
             <div class="control-row">
-              <label for="modelScale">Scale <output id="scaleValue">100%</output></label>
+              <div class="range-heading">
+                <label for="objectRotate">Rotate</label>
+                <span class="range-number has-unit"><input id="objectRotateValue" type="number" min="-180" max="180" step="1" value="0" aria-label="Object rotation in degrees" /><span>°</span></span>
+              </div>
+              <input id="objectRotate" type="range" min="-180" max="180" step="1" value="0" />
+            </div>
+            <div class="control-row">
+              <div class="range-heading">
+                <label for="modelScale">Scale</label>
+                <span class="range-number has-unit"><input id="scaleValue" type="number" min="25" max="200" step="1" value="100" aria-label="Object scale percentage" /><span>%</span></span>
+              </div>
               <input id="modelScale" type="range" min="0.25" max="2" step="0.01" value="1" />
             </div>
             <label class="toggle-row">
@@ -243,7 +272,10 @@
               <span class="toggle-ui"></span>
             </label>
             <div class="control-row">
-              <label for="padding">Object padding <output id="paddingValue">12%</output></label>
+              <div class="range-heading">
+                <label for="padding">Object padding</label>
+                <span class="range-number has-unit"><input id="paddingValue" type="number" min="2" max="30" step="1" value="12" aria-label="Object padding percentage" /><span>%</span></span>
+              </div>
               <input id="padding" type="range" min="2" max="30" step="1" value="12" />
             </div>
           </section>
