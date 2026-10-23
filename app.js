@@ -33,6 +33,8 @@ let cameraPresets = readCameraPresets();
 
 const scene = new THREE.Scene();
 const modelPivot = new THREE.Group();
+const orientationPivot = new THREE.Group();
+modelPivot.add(orientationPivot);
 scene.add(modelPivot);
 
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
@@ -105,7 +107,7 @@ grid.visible = false;
 scene.add(grid);
 
 let currentObject = createDemoProduct();
-modelPivot.add(currentObject);
+orientationPivot.add(currentObject);
 prepareObject(currentObject, false);
 
 function createDemoProduct() {
@@ -204,8 +206,8 @@ function normalizeObject(object) {
 
 function getBounds() {
   if (!currentObject) return new THREE.Box3(new THREE.Vector3(-1), new THREE.Vector3(1));
-  currentObject.updateMatrixWorld(true);
-  return new THREE.Box3().setFromObject(currentObject);
+  scene.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(orientationPivot);
 }
 
 function fitCameraToObject(view = 'iso') {
@@ -385,6 +387,11 @@ function setViewAngle(name) {
   else if (name === 'right') direction = frame.front.clone().applyAxisAngle(frame.up, Math.PI / 2);
   else if (name === 'three-quarter-left') direction = frame.front.clone().applyAxisAngle(frame.up, -yaw);
   else if (name === 'three-quarter-right') direction = frame.front.clone().applyAxisAngle(frame.up, yaw);
+  else if (name === 'front-elevated') {
+    const elevation = THREE.MathUtils.degToRad(20);
+    direction = frame.front.clone().multiplyScalar(Math.cos(elevation)).addScaledVector(frame.up, Math.sin(elevation)).normalize();
+    cameraUp = perpendicularUp(direction, frame.up);
+  }
   else if (name === 'top') {
     direction = frame.up.clone();
     cameraUp = frame.front.clone().negate();
@@ -440,7 +447,8 @@ function captureCameraPreset(name) {
     focalLength: perspectiveCamera.getFocalLength(),
     orthoZoom: orthographicCamera.zoom,
     objectRotationY: modelPivot.rotation.y,
-    objectRotationZ: modelPivot.rotation.z,
+    objectRotationX: orientationPivot.rotation.x,
+    objectOrientationY: orientationPivot.rotation.y,
     modelScale: Number($('#modelScale').value),
     padding: state.padding,
     angleBaseline: state.angleBaseline ? {
@@ -478,11 +486,14 @@ function saveCurrentCamera() {
 
 function applyCameraPreset(preset) {
   modelPivot.rotation.y = preset.objectRotationY || 0;
-  modelPivot.rotation.z = preset.objectRotationZ || 0;
+  orientationPivot.rotation.x = preset.objectRotationX ?? preset.objectRotationZ ?? 0;
+  orientationPivot.rotation.y = preset.objectOrientationY || 0;
   const turntableDegrees = Math.round(THREE.MathUtils.radToDeg(modelPivot.rotation.y));
-  const rotateDegrees = Math.round(THREE.MathUtils.radToDeg(modelPivot.rotation.z));
+  const rotateXDegrees = Math.round(THREE.MathUtils.radToDeg(orientationPivot.rotation.x));
+  const rotateYDegrees = Math.round(THREE.MathUtils.radToDeg(orientationPivot.rotation.y));
   setRangePair('rotation', 'rotationValue', turntableDegrees);
-  setRangePair('objectRotate', 'objectRotateValue', rotateDegrees);
+  setRangePair('rotateX', 'rotateXValue', rotateXDegrees);
+  setRangePair('rotateY', 'rotateYValue', rotateYDegrees);
 
   const modelScale = THREE.MathUtils.clamp(Number(preset.modelScale) || 1, .25, 2);
   currentObject.scale.setScalar(state.baseScale * modelScale);
@@ -736,17 +747,19 @@ async function loadFiles(files) {
 
 function replaceCurrentObject(object, name, fileCount) {
   disposeObject(currentObject);
-  modelPivot.remove(currentObject);
+  orientationPivot.remove(currentObject);
   currentObject = object;
   currentObject.name = name;
   modelPivot.rotation.set(0, 0, 0);
-  modelPivot.add(currentObject);
+  orientationPivot.rotation.set(0, 0, 0);
+  orientationPivot.add(currentObject);
   prepareObject(currentObject);
   state.objectName = name.replace(/\.[^.]+$/, '');
   $('#fileName').textContent = name;
   $('#fileMeta').textContent = fileCount > 1 ? `${fileCount} files` : extension(name).toUpperCase();
   setRangePair('rotation', 'rotationValue', 0);
-  setRangePair('objectRotate', 'objectRotateValue', 0);
+  setRangePair('rotateX', 'rotateXValue', 0);
+  setRangePair('rotateY', 'rotateYValue', 0);
   resetAngleBaseline(false);
 }
 
@@ -790,9 +803,14 @@ bindRangePair({
   onChange: (value) => { modelPivot.rotation.y = THREE.MathUtils.degToRad(value); },
 });
 bindRangePair({
-  rangeId: 'objectRotate',
-  numberId: 'objectRotateValue',
-  onChange: (value) => { modelPivot.rotation.z = THREE.MathUtils.degToRad(value); },
+  rangeId: 'rotateX',
+  numberId: 'rotateXValue',
+  onChange: (value) => { orientationPivot.rotation.x = THREE.MathUtils.degToRad(value); },
+});
+bindRangePair({
+  rangeId: 'rotateY',
+  numberId: 'rotateYValue',
+  onChange: (value) => { orientationPivot.rotation.y = THREE.MathUtils.degToRad(value); },
 });
 bindRangePair({
   rangeId: 'modelScale',
@@ -830,8 +848,10 @@ $('#resetScene').addEventListener('click', resetScene);
 
 function resetScene() {
   modelPivot.rotation.set(0, 0, 0);
+  orientationPivot.rotation.set(0, 0, 0);
   setRangePair('rotation', 'rotationValue', 0);
-  setRangePair('objectRotate', 'objectRotateValue', 0);
+  setRangePair('rotateX', 'rotateXValue', 0);
+  setRangePair('rotateY', 'rotateYValue', 0);
   controls.autoRotate = false; $('#autoRotate').checked = false;
   currentObject.scale.setScalar(state.baseScale);
   setRangePair('modelScale', 'scaleValue', 1, 100);
@@ -939,6 +959,7 @@ const batchAngles = [
   { key: 'top', label: 'Top', file: 'top' },
   { key: 'bottom', label: 'Bottom', file: 'bottom' },
   { key: 'front', label: 'Front', file: 'front' },
+  { key: 'front-elevated', label: 'Front elevated', file: 'front-elevated' },
   { key: 'back', label: 'Back', file: 'back' },
   { key: 'left', label: 'Left', file: 'left' },
   { key: 'right', label: 'Right', file: 'right' },
@@ -993,7 +1014,7 @@ async function exportAllAngles() {
   const singleButtons = [$('#exportLarge'), $('#exportButton')];
   batchButton.disabled = true;
   singleButtons.forEach((button) => { button.disabled = true; });
-  showStatus('Preparing 8-angle render…');
+  showStatus('Preparing 9-angle render…');
   await nextFrame();
 
   const originalSize = renderer.getSize(new THREE.Vector2());
@@ -1020,7 +1041,7 @@ async function exportAllAngles() {
     const zip = new JSZip();
     for (let index = 0; index < batchAngles.length; index += 1) {
       const angle = batchAngles[index];
-      showStatus(`Rendering ${index + 1} of 8 · ${angle.label}`);
+      showStatus(`Rendering ${index + 1} of 9 · ${angle.label}`);
       setViewAngle(angle.key);
       await nextFrame();
       renderer.render(scene, activeCamera);
@@ -1028,7 +1049,7 @@ async function exportAllAngles() {
       zip.file(`${cleanName}-${angle.file}-${width}x${height}.png`, blob);
     }
 
-    showStatus('Packaging eight PNGs…');
+    showStatus('Packaging nine PNGs…');
     const zipBlob = await zip.generateAsync(
       { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
       (metadata) => { $('#renderStatusText').textContent = `Packaging · ${Math.round(metadata.percent)}%`; },
@@ -1039,7 +1060,7 @@ async function exportAllAngles() {
     anchor.download = `${cleanName}-all-angles-${width}x${height}.zip`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 15000);
-    showToast('Downloaded all 8 object angles');
+    showToast('Downloaded all 9 object angles');
   } catch (error) {
     console.error(error);
     showToast('The batch render could not finish. Try a smaller output size.');
