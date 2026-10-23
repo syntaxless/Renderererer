@@ -41,7 +41,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true,
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setClearColor(0x000000, 0);
@@ -97,6 +97,7 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.004;
 floor.receiveShadow = true;
+floor.visible = false;
 scene.add(floor);
 
 const grid = new THREE.GridHelper(20, 40, 0x67706d, 0x3f4745);
@@ -580,7 +581,7 @@ function renderCameraPresets() {
 
 function applyLightingPreset(name) {
   const presets = {
-    softbox: { exposure: 1.1, hemi: 1.15, key: 8.5, fill: 4.2, rim: 5.5, keyColor: 0xffffff, fillColor: 0xc8dcff, rimColor: 0x7dc244 },
+    softbox: { exposure: 1, hemi: 1.15, key: 8.5, fill: 4.2, rim: 5.5, keyColor: 0xffffff, fillColor: 0xc8dcff, rimColor: 0x7dc244 },
     bright: { exposure: 1.25, hemi: 1.55, key: 11, fill: 7.5, rim: 6.5, keyColor: 0xffffff, fillColor: 0xffffff, rimColor: 0xffffff },
     dramatic: { exposure: .92, hemi: .48, key: 10.5, fill: 1.15, rim: 10, keyColor: 0xfff2dc, fillColor: 0x7aa3ff, rimColor: 0x7dc244 },
     catalog: { exposure: 1.18, hemi: 1.7, key: 7.5, fill: 6.8, rim: 4, keyColor: 0xffffff, fillColor: 0xf7fbff, rimColor: 0xffffff },
@@ -853,6 +854,7 @@ function resetScene() {
   setRangePair('rotateX', 'rotateXValue', 0);
   setRangePair('rotateY', 'rotateYValue', 0);
   controls.autoRotate = false; $('#autoRotate').checked = false;
+  floor.visible = false; $('#groundToggle').checked = false;
   currentObject.scale.setScalar(state.baseScale);
   setRangePair('modelScale', 'scaleValue', 1, 100);
   $('#environmentPreset').value = 'softbox'; applyLightingPreset('softbox');
