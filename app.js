@@ -25,6 +25,7 @@ const state = {
   files: [],
   objectName: 'studio-demo',
   objectBounds: null,
+  angleBaseline: null,
 };
 
 const CAMERA_PRESET_KEY = 'product-shot-studio.camera-presets.v1';
@@ -198,8 +199,7 @@ function normalizeObject(object) {
   object.updateMatrixWorld(true);
   state.objectBounds = new THREE.Box3().setFromObject(object);
   state.baseScale = object.scale.x;
-  $('#modelScale').value = '1';
-  $('#scaleValue').value = '100%';
+  setRangePair('modelScale', 'scaleValue', 1, 100);
 }
 
 function getBounds() {
@@ -303,38 +303,108 @@ function setActiveCamera(type) {
   $$('#cameraType button').forEach((button) => button.classList.toggle('active', button.dataset.camera === type));
 }
 
-const viewAngles = {
-  top: { direction: [0, 1, 0.001], up: [0, 0, -1] },
-  bottom: { direction: [0, -1, 0.001], up: [0, 0, 1] },
-  front: { direction: [0, 0.04, 1], up: [0, 1, 0] },
-  back: { direction: [0, 0.04, -1], up: [0, 1, 0] },
-  left: { direction: [-1, 0.04, 0], up: [0, 1, 0] },
-  right: { direction: [1, 0.04, 0], up: [0, 1, 0] },
-  'three-quarter-left': { direction: [-0.78, 0.38, 1], up: [0, 1, 0] },
-  'three-quarter-right': { direction: [0.78, 0.38, 1], up: [0, 1, 0] },
-};
+function perpendicularUp(front, candidate = new THREE.Vector3(0, 1, 0)) {
+  const up = candidate.clone().projectOnPlane(front);
+  if (up.lengthSq() < 1e-6) up.copy(Math.abs(front.y) < .95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, -1)).projectOnPlane(front);
+  return up.normalize();
+}
 
-function setViewAngle(name) {
-  const view = viewAngles[name];
-  if (!view) return;
-  const sphere = getBounds().getBoundingSphere(new THREE.Sphere());
-  const center = sphere.center;
-  const radius = Math.max(sphere.radius, .35);
-  const direction = new THREE.Vector3().fromArray(view.direction).normalize();
+function defaultAngleDistance(radius) {
   const vFov = THREE.MathUtils.degToRad(perspectiveCamera.fov);
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * perspectiveCamera.aspect);
-  const distance = (radius * (1 + state.padding / 100)) / Math.sin(Math.min(vFov, hFov) / 2);
-  activeCamera.position.copy(center).addScaledVector(direction, distance);
-  activeCamera.up.fromArray(view.up);
+  return (radius * (1 + state.padding / 100)) / Math.sin(Math.min(vFov, hFov) / 2);
+}
+
+function getAngleFrame(sphere) {
+  if (!state.angleBaseline) {
+    return {
+      front: new THREE.Vector3(0, 0, 1),
+      up: new THREE.Vector3(0, 1, 0),
+      target: sphere.center.clone(),
+      distance: defaultAngleDistance(Math.max(sphere.radius, .35)),
+      orthoZoom: 1,
+    };
+  }
+  const radius = Math.max(sphere.radius, .001);
+  const front = new THREE.Vector3().fromArray(state.angleBaseline.front).normalize();
+  return {
+    front,
+    up: perpendicularUp(front, new THREE.Vector3().fromArray(state.angleBaseline.up)),
+    target: sphere.center.clone().add(new THREE.Vector3().fromArray(state.angleBaseline.targetOffset).multiplyScalar(radius)),
+    distance: radius * state.angleBaseline.distanceRatio,
+    orthoZoom: state.angleBaseline.orthoZoom || 1,
+  };
+}
+
+function setAngleBaseline() {
+  const sphere = getBounds().getBoundingSphere(new THREE.Sphere());
+  const radius = Math.max(sphere.radius, .001);
+  const target = controls.target.clone();
+  const cameraOffset = activeCamera.position.clone().sub(target);
+  if (cameraOffset.lengthSq() < 1e-8) return showToast('Move the camera before setting a baseline');
+  const front = cameraOffset.normalize();
+  const up = perpendicularUp(front, activeCamera.up);
+  state.angleBaseline = {
+    front: front.toArray(),
+    up: up.toArray(),
+    targetOffset: target.sub(sphere.center).divideScalar(radius).toArray(),
+    distanceRatio: activeCamera.position.distanceTo(controls.target) / radius,
+    orthoZoom: activeCamera.isOrthographicCamera ? activeCamera.zoom : 1,
+  };
+  updateAngleBaselineUi();
+  $$('.angle-grid button').forEach((button) => button.classList.remove('active'));
+  showToast('Current view set as the angle baseline');
+}
+
+function resetAngleBaseline(showMessage = true) {
+  state.angleBaseline = null;
+  updateAngleBaselineUi();
+  $$('.angle-grid button').forEach((button) => button.classList.remove('active'));
+  if (showMessage) showToast('Angle baseline reset');
+}
+
+function updateAngleBaselineUi() {
+  const status = $('#angleBaselineStatus');
+  const reset = $('#resetAngleBaseline');
+  if (!status || !reset) return;
+  status.textContent = state.angleBaseline ? 'Custom baseline ready. Presets orbit from this view.' : 'Using the default front view.';
+  status.classList.toggle('custom', Boolean(state.angleBaseline));
+  reset.disabled = !state.angleBaseline;
+}
+
+function setViewAngle(name) {
+  const sphere = getBounds().getBoundingSphere(new THREE.Sphere());
+  const frame = getAngleFrame(sphere);
+  const radius = Math.max(sphere.radius, .35);
+  const yaw = THREE.MathUtils.degToRad(38);
+  let direction;
+  let cameraUp = frame.up.clone();
+  if (name === 'front') direction = frame.front.clone();
+  else if (name === 'back') direction = frame.front.clone().negate();
+  else if (name === 'left') direction = frame.front.clone().applyAxisAngle(frame.up, -Math.PI / 2);
+  else if (name === 'right') direction = frame.front.clone().applyAxisAngle(frame.up, Math.PI / 2);
+  else if (name === 'three-quarter-left') direction = frame.front.clone().applyAxisAngle(frame.up, -yaw);
+  else if (name === 'three-quarter-right') direction = frame.front.clone().applyAxisAngle(frame.up, yaw);
+  else if (name === 'top') {
+    direction = frame.up.clone();
+    cameraUp = frame.front.clone().negate();
+  } else if (name === 'bottom') {
+    direction = frame.up.clone().negate();
+    cameraUp = frame.front.clone();
+  } else return;
+  direction.normalize();
+  const distance = state.angleBaseline ? frame.distance : defaultAngleDistance(radius);
+  activeCamera.position.copy(frame.target).addScaledVector(direction, distance);
+  activeCamera.up.copy(cameraUp.normalize());
   activeCamera.near = Math.max(distance / 200, .005);
   activeCamera.far = distance * 40;
   if (activeCamera.isOrthographicCamera) {
     updateOrthoAspect(activeCamera.aspect || perspectiveCamera.aspect);
-    activeCamera.zoom = 1;
+    activeCamera.zoom = state.angleBaseline ? frame.orthoZoom : 1;
   }
-  activeCamera.lookAt(center);
+  activeCamera.lookAt(frame.target);
   activeCamera.updateProjectionMatrix();
-  controls.target.copy(center);
+  controls.target.copy(frame.target);
   controls.update();
   $$('.angle-grid button').forEach((button) => button.classList.toggle('active', button.dataset.angle === name));
 }
@@ -370,8 +440,16 @@ function captureCameraPreset(name) {
     focalLength: perspectiveCamera.getFocalLength(),
     orthoZoom: orthographicCamera.zoom,
     objectRotationY: modelPivot.rotation.y,
+    objectRotationZ: modelPivot.rotation.z,
     modelScale: Number($('#modelScale').value),
     padding: state.padding,
+    angleBaseline: state.angleBaseline ? {
+      front: [...state.angleBaseline.front],
+      up: [...state.angleBaseline.up],
+      targetOffset: [...state.angleBaseline.targetOffset],
+      distanceRatio: state.angleBaseline.distanceRatio,
+      orthoZoom: state.angleBaseline.orthoZoom,
+    } : null,
     createdAt: Date.now(),
   };
 }
@@ -400,27 +478,33 @@ function saveCurrentCamera() {
 
 function applyCameraPreset(preset) {
   modelPivot.rotation.y = preset.objectRotationY || 0;
-  const degrees = Math.round(THREE.MathUtils.radToDeg(modelPivot.rotation.y));
-  $('#rotation').value = String(THREE.MathUtils.clamp(degrees, -180, 180));
-  $('#rotationValue').value = `${degrees}°`;
-  updateRangeFill($('#rotation'));
+  modelPivot.rotation.z = preset.objectRotationZ || 0;
+  const turntableDegrees = Math.round(THREE.MathUtils.radToDeg(modelPivot.rotation.y));
+  const rotateDegrees = Math.round(THREE.MathUtils.radToDeg(modelPivot.rotation.z));
+  setRangePair('rotation', 'rotationValue', turntableDegrees);
+  setRangePair('objectRotate', 'objectRotateValue', rotateDegrees);
 
   const modelScale = THREE.MathUtils.clamp(Number(preset.modelScale) || 1, .25, 2);
   currentObject.scale.setScalar(state.baseScale * modelScale);
-  $('#modelScale').value = String(modelScale);
-  $('#scaleValue').value = `${Math.round(modelScale * 100)}%`;
-  updateRangeFill($('#modelScale'));
+  setRangePair('modelScale', 'scaleValue', modelScale, modelScale * 100);
 
   state.padding = THREE.MathUtils.clamp(Number(preset.padding) || 12, 2, 30);
-  $('#padding').value = String(state.padding);
-  $('#paddingValue').value = `${state.padding}%`;
-  updateRangeFill($('#padding'));
+  setRangePair('padding', 'paddingValue', state.padding);
+
+  state.angleBaseline = preset.angleBaseline?.front && preset.angleBaseline?.up && preset.angleBaseline?.targetOffset
+    ? {
+      front: [...preset.angleBaseline.front],
+      up: [...preset.angleBaseline.up],
+      targetOffset: [...preset.angleBaseline.targetOffset],
+      distanceRatio: Number(preset.angleBaseline.distanceRatio) || 5,
+      orthoZoom: Number(preset.angleBaseline.orthoZoom) || 1,
+    }
+    : null;
+  updateAngleBaselineUi();
 
   setActiveCamera(preset.cameraType === 'orthographic' ? 'orthographic' : 'perspective');
   perspectiveCamera.setFocalLength(THREE.MathUtils.clamp(Number(preset.focalLength) || 70, 24, 150));
-  $('#focalLength').value = String(Math.round(perspectiveCamera.getFocalLength()));
-  $('#focalValue').value = `${Math.round(perspectiveCamera.getFocalLength())} mm`;
-  updateRangeFill($('#focalLength'));
+  setRangePair('focalLength', 'focalValue', Math.round(perspectiveCamera.getFocalLength()));
 
   const sphere = getBounds().getBoundingSphere(new THREE.Sphere());
   const radius = Math.max(sphere.radius, .001);
@@ -499,9 +583,7 @@ function applyLightingPreset(name) {
   keyLight.color.setHex(p.keyColor);
   fillLight.color.setHex(p.fillColor);
   rimLight.color.setHex(p.rimColor);
-  $('#exposure').value = String(p.exposure);
-  $('#exposureValue').value = p.exposure.toFixed(2);
-  updateRangeFill($('#exposure'));
+  setRangePair('exposure', 'exposureValue', p.exposure);
 }
 
 function setBackdrop(name) {
@@ -522,6 +604,55 @@ function updateRangeFill(input) {
   const max = Number(input.max || 100);
   const value = Number(input.value);
   input.style.setProperty('--fill', `${((value - min) / (max - min)) * 100}%`);
+}
+
+function decimalPlaces(step) {
+  const text = String(step || '1');
+  return text.includes('.') ? text.split('.')[1].length : 0;
+}
+
+function writeNumberValue(input, value) {
+  input.value = Number(value).toFixed(decimalPlaces(input.step));
+}
+
+function clampForInput(input, value) {
+  const min = Number.isFinite(Number(input.min)) ? Number(input.min) : -Infinity;
+  const max = Number.isFinite(Number(input.max)) ? Number(input.max) : Infinity;
+  return THREE.MathUtils.clamp(value, min, max);
+}
+
+function setRangePair(rangeId, numberId, rangeValue, numberValue = rangeValue) {
+  const range = $(`#${rangeId}`);
+  const number = $(`#${numberId}`);
+  range.value = String(clampForInput(range, Number(rangeValue)));
+  writeNumberValue(number, clampForInput(number, Number(numberValue)));
+  updateRangeFill(range);
+}
+
+function bindRangePair({ rangeId, numberId, rangeToNumber = (value) => value, numberToRange = (value) => value, onChange }) {
+  const range = $(`#${rangeId}`);
+  const number = $(`#${numberId}`);
+  const applyRange = () => {
+    const value = Number(range.value);
+    writeNumberValue(number, clampForInput(number, rangeToNumber(value)));
+    updateRangeFill(range);
+    onChange(value);
+  };
+  const applyNumber = (commit = false) => {
+    if (number.value.trim() === '') return;
+    const typed = Number(number.value);
+    if (!Number.isFinite(typed)) return;
+    const numberValue = clampForInput(number, typed);
+    if (commit) writeNumberValue(number, numberValue);
+    const rangeValue = clampForInput(range, numberToRange(numberValue));
+    range.value = String(rangeValue);
+    updateRangeFill(range);
+    onChange(rangeValue);
+  };
+  range.addEventListener('input', applyRange);
+  number.addEventListener('input', () => applyNumber(false));
+  number.addEventListener('change', () => applyNumber(true));
+  number.addEventListener('keydown', (event) => { if (event.key === 'Enter') number.blur(); });
 }
 $$('input[type="range"]').forEach(updateRangeFill);
 
@@ -614,9 +745,9 @@ function replaceCurrentObject(object, name, fileCount) {
   state.objectName = name.replace(/\.[^.]+$/, '');
   $('#fileName').textContent = name;
   $('#fileMeta').textContent = fileCount > 1 ? `${fileCount} files` : extension(name).toUpperCase();
-  $('#rotation').value = '0';
-  $('#rotationValue').value = '0°';
-  updateRangeFill($('#rotation'));
+  setRangePair('rotation', 'rotationValue', 0);
+  setRangePair('objectRotate', 'objectRotateValue', 0);
+  resetAngleBaseline(false);
 }
 
 function disposeObject(root) {
@@ -633,32 +764,44 @@ function disposeObject(root) {
 function extension(name) { return name.split('.').pop().toLowerCase(); }
 
 $('#environmentPreset').addEventListener('change', (event) => applyLightingPreset(event.target.value));
-$('#exposure').addEventListener('input', (event) => {
-  renderer.toneMappingExposure = Number(event.target.value);
-  $('#exposureValue').value = Number(event.target.value).toFixed(2);
-  updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'exposure',
+  numberId: 'exposureValue',
+  onChange: (value) => { renderer.toneMappingExposure = value; },
 });
-$('#shadowStrength').addEventListener('input', (event) => {
-  floorMaterial.opacity = Number(event.target.value);
-  $('#shadowValue').value = `${Math.round(Number(event.target.value) * 100)}%`;
-  updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'shadowStrength',
+  numberId: 'shadowValue',
+  rangeToNumber: (value) => value * 100,
+  numberToRange: (value) => value / 100,
+  onChange: (value) => { floorMaterial.opacity = value; },
 });
-$('#focalLength').addEventListener('input', (event) => {
-  perspectiveCamera.setFocalLength(Number(event.target.value));
-  perspectiveCamera.updateProjectionMatrix();
-  $('#focalValue').value = `${event.target.value} mm`;
-  updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'focalLength',
+  numberId: 'focalValue',
+  onChange: (value) => {
+    perspectiveCamera.setFocalLength(value);
+    perspectiveCamera.updateProjectionMatrix();
+  },
 });
-$('#rotation').addEventListener('input', (event) => {
-  modelPivot.rotation.y = THREE.MathUtils.degToRad(Number(event.target.value));
-  $('#rotationValue').value = `${event.target.value}°`;
-  updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'rotation',
+  numberId: 'rotationValue',
+  onChange: (value) => { modelPivot.rotation.y = THREE.MathUtils.degToRad(value); },
 });
-$('#modelScale').addEventListener('input', (event) => {
-  const scale = Number(event.target.value);
-  currentObject.scale.setScalar(state.baseScale * scale);
-  $('#scaleValue').value = `${Math.round(scale * 100)}%`;
-  updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'objectRotate',
+  numberId: 'objectRotateValue',
+  onChange: (value) => { modelPivot.rotation.z = THREE.MathUtils.degToRad(value); },
+});
+bindRangePair({
+  rangeId: 'modelScale',
+  numberId: 'scaleValue',
+  rangeToNumber: (value) => value * 100,
+  numberToRange: (value) => value / 100,
+  onChange: (scale) => {
+    currentObject.scale.setScalar(state.baseScale * scale);
+  },
 });
 $('#autoRotate').addEventListener('change', (event) => { controls.autoRotate = event.target.checked; controls.autoRotateSpeed = 1.1; });
 $('#groundToggle').addEventListener('change', (event) => { floor.visible = event.target.checked; });
@@ -670,6 +813,8 @@ $('#hqShadows').addEventListener('change', (event) => {
 $$('#cameraType button').forEach((button) => button.addEventListener('click', () => setActiveCamera(button.dataset.camera)));
 $$('.swatch').forEach((button) => button.addEventListener('click', () => setBackdrop(button.dataset.bg)));
 $$('.angle-grid button').forEach((button) => button.addEventListener('click', () => setViewAngle(button.dataset.angle)));
+$('#setAngleBaseline').addEventListener('click', setAngleBaseline);
+$('#resetAngleBaseline').addEventListener('click', () => resetAngleBaseline(true));
 $('#saveCameraPreset').addEventListener('click', saveCurrentCamera);
 $('#presetName').addEventListener('keydown', (event) => { if (event.key === 'Enter') saveCurrentCamera(); });
 controls.addEventListener('start', () => $$('.angle-grid button').forEach((button) => button.classList.remove('active')));
@@ -685,12 +830,13 @@ $('#resetScene').addEventListener('click', resetScene);
 
 function resetScene() {
   modelPivot.rotation.set(0, 0, 0);
-  $('#rotation').value = '0'; $('#rotationValue').value = '0°'; updateRangeFill($('#rotation'));
+  setRangePair('rotation', 'rotationValue', 0);
+  setRangePair('objectRotate', 'objectRotateValue', 0);
   controls.autoRotate = false; $('#autoRotate').checked = false;
   currentObject.scale.setScalar(state.baseScale);
-  $('#modelScale').value = '1'; $('#scaleValue').value = '100%'; updateRangeFill($('#modelScale'));
+  setRangePair('modelScale', 'scaleValue', 1, 100);
   $('#environmentPreset').value = 'softbox'; applyLightingPreset('softbox');
-  $$('.angle-grid button').forEach((button) => button.classList.remove('active'));
+  resetAngleBaseline(false);
   fitCameraToObject(); showToast('Scene reset');
 }
 
@@ -722,8 +868,10 @@ $('#exportHeight').addEventListener('input', () => {
   if (state.ratioLocked) $('#exportWidth').value = Math.round(clampDimension($('#exportHeight').value) * state.ratio);
   updateExportSummary();
 });
-$('#padding').addEventListener('input', (event) => {
-  state.padding = Number(event.target.value); $('#paddingValue').value = `${event.target.value}%`; updateRangeFill(event.target);
+bindRangePair({
+  rangeId: 'padding',
+  numberId: 'paddingValue',
+  onChange: (value) => { state.padding = value; },
 });
 
 function clampDimension(value) { return THREE.MathUtils.clamp(Math.round(Number(value) || 256), 256, 8192); }
@@ -925,4 +1073,5 @@ setBackdrop('transparent');
 applyLightingPreset('softbox');
 resizeRenderer();
 fitCameraToObject();
+updateAngleBaselineUi();
 renderCameraPresets();
